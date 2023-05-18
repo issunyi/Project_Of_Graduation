@@ -11,13 +11,13 @@ layui.use(['echarts'], function() {
             });
             option = {
             title: {
-              text: 'Step Line'
+              text: '风力风向'
             },
             tooltip: {
               trigger: 'axis'
             },
             legend: {
-              data: ['am_wind_toward', 'pm_wind_toward']
+              data: ['白天风力风向', '夜晚风力风向']
             },
             grid: {
               left: '3%',
@@ -39,16 +39,18 @@ layui.use(['echarts'], function() {
             },
             series: [
               {
-                name: 'am_wind_toward',
+                name: '白天风力风向',
                 type: 'line',
                 step: 'start',
-                data: data.am_wind_toward
+                data: data.am_wind_toward,
+                showSymbol: true,
               },
               {
-                name: 'pm_wind_toward',
+                name: '夜晚风力风向',
                 type: 'line',
                 step: 'middle',
                 data: data.pm_wind_toward,
+                showSymbol: true,
               }]
             };
             plot3.setOption(option);

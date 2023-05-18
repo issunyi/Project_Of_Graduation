@@ -32,31 +32,50 @@ def plot_total_active_power() :
 
 
 # mysql数据库读取并转化为dataframe
-def get_df_from_db(sql):
-    db = pymysql.connect(host="localhost", user="root", passwd="sun010628", db="practice")
-    cursor = db.cursor()  # 使用cursor()方法获取用于执行SQL语句的游标
-    cursor.execute(sql)  # 执行SQL语句
-    """
-    使用fetchall函数以元组形式返回所有查询结果并打印出来
-    fetchone()返回第一行，fetchmany(n)返回前n行
-    游标执行一次后则定位在当前操作行，下一次操作从当前操作行开始
-    """
-    data = cursor.fetchall()
+def get_data():
+    total_active_power = []
+    highest_temp = []
+    lowest_temp = []
+    am_wind_toward = []
+    pm_wind_toward = []
+    weather_1 = []
+    weather_2 = []
 
-    # 下面为将获取的数据转化为dataframe格式
-    columnDes = cursor.description  # 获取连接对象的描述信息
-    columnNames = [columnDes[i][0] for i in range(len(columnDes))]  # 获取列名
-    df = pd.DataFrame([list(i) for i in data], columns=columnNames)  # 得到的data为二维元组，逐行取出，转化为列表，再转化为df
+    date_time = []
 
-    """
-    使用完成之后需关闭游标和数据库连接，减少资源占用,cursor.close(),db.close()
-    db.commit()若对数据库进行了修改，需进行提交之后再关闭
-    """
-    cursor.close()
-    db.close()
+    conn = pymysql.Connect(
+        host='localhost',
+        port=3306,
+        user='root',
+        passwd='sun010628',
+        db='test_users',
+        charset='utf8'
+    )
+    # print("连接数据库成功")
+    cur = conn.cursor()
+    sql = "select * from data"
+    cur.execute(sql)
+    result = cur.fetchall()
 
-    # print("cursor.description中的内容：", columnDes)
-    return df
+    for item in result:
+        date_time.append(item[0].strftime('%Y-%m-%d %H:%M:%S'))
+        total_active_power.append(float(item[1]))
+        highest_temp.append(float(item[2]))
+        lowest_temp.append(float(item[3]))
+        am_wind_toward.append(int(item[4]))
+        pm_wind_toward.append(int(item[5]))
+        weather_1.append(int(item[6]))
+        weather_2.append(int(item[7]))
+
+    mycursor = conn.cursor()
+    mycursor.execute("SELECT MIN(date), MAX(date) FROM data")
+    date_range = mycursor.fetchone()
+    min_date = date_range[0].isoformat()
+    max_date = date_range[1].isoformat()
+
+    return total_active_power,highest_temp,lowest_temp,am_wind_toward,pm_wind_toward,weather_1,weather_2,min_date,max_date,date_time
+    cur.close()
+    conn.close()
 
 # class connect_mysql_highest_temp(object):
 #     def __init__(self):

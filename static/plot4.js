@@ -11,13 +11,13 @@ layui.use(['echarts'], function() {
             });
             option = {
             title: {
-              text: 'Step Line'
+              text: '天气状况特征'
             },
             tooltip: {
               trigger: 'axis'
             },
             legend: {
-              data: ['weather_1', 'weather_2']
+              data: ['天气状况特征1', '天气状况特征2']
             },
             grid: {
               left: '3%',
@@ -39,13 +39,13 @@ layui.use(['echarts'], function() {
             },
             series: [
               {
-                name: 'weather_1',
+                name: '天气状况特征1',
                 type: 'line',
                 step: 'start',
                 data: data.weather_1
               },
               {
-                name: 'weather_2',
+                name: '天气状况特征2',
                 type: 'line',
                 step: 'middle',
                 data: data.weather_2,

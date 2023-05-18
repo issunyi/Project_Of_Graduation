@@ -6,6 +6,15 @@ import function
 from flask import jsonify
 from datetime import date
 from datetime import datetime, timedelta
+import pandas as pd
+from prophet import Prophet
+import statsmodels.api as sm
+import warnings
+from sklearn.preprocessing import MinMaxScaler
+import numpy as np
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, LSTM
+
 
 
 pymysql.install_as_MySQLdb()
@@ -71,7 +80,7 @@ def total_power_monitor():
 # 功率异常点监测
 @app.route('/power_outlier_monitor')
 def power_outlier_monitor():
-    return render_template('power_outlier_monitor.html')
+    return render_template('outlier_monitor.html')
 
 @app.route('/get_environment_data')
 def get_environment_data():
@@ -129,6 +138,146 @@ def get_environment_data():
     cur.close()
     conn.close()
 
+
+# 多元时序预测
+@app.route('/fbprophet')
+def fbprophet():
+    conn = pymysql.Connect(
+        host='localhost',
+        port=3306,
+        user='root',
+        passwd='sun010628',
+        db='test_users',
+        charset='utf8'
+    )
+
+    df = pd.read_sql_query("select * from data", conn)
+    feature_columns = [
+        'highest_temp', 'lowest_temp', 'am_wind_toward', 'pm_wind_toward', 'weather_1', 'weather_2'
+    ]
+    target_column = ['total_active_power']
+
+    train_size = int(0.85 * len(df))
+
+    multivariate_df = df[['date'] + target_column + feature_columns].copy()
+    multivariate_df.columns = ['ds', 'y'] + feature_columns
+
+    train = multivariate_df.iloc[:train_size, :]
+    x_train, y_train = pd.DataFrame(multivariate_df.iloc[:train_size, [0, 2, 3, 4, 5, 6, 7]]), pd.DataFrame(
+        multivariate_df.iloc[:train_size, 1])
+    x_valid, y_valid = pd.DataFrame(multivariate_df.iloc[train_size:, [0, 2, 3, 4, 5, 6, 7]]), pd.DataFrame(
+        multivariate_df.iloc[train_size:, 1])
+    train = multivariate_df.iloc[:train_size, :]
+
+    model = Prophet()
+    model.fit(train)
+    y_pred = model.predict(x_valid)
+
+    y_pred_ = y_pred['yhat'].values.tolist()
+    x_valid_ = y_pred['ds'].dt.strftime('%Y-%m-%d %H:%M:%S').values.tolist()
+    y_valid_ = y_valid['y'].values.tolist()
+
+    return jsonify(
+                   y_pred = y_pred_,
+                   x_valid = x_valid_,
+                   y_valid = y_valid_
+                   )
+
+# 多元时序预测
+@app.route('/lstm')
+def lstm():
+    conn = pymysql.Connect(
+        host='localhost',
+        port=3306,
+        user='root',
+        passwd='sun010628',
+        db='test_users',
+        charset='utf8'
+    )
+    df = pd.read_sql_query("select * from data_process", conn)
+    train_size = int(0.85 * len(df))
+    test_size = len(df) - train_size
+    df = df.fillna(0)
+    univariate_df = df[['date', 'total_active_power']].copy()
+    univariate_df.columns = ['ds', 'y']
+
+    train = univariate_df.iloc[:train_size, :]
+
+    x_train, y_train = pd.DataFrame(univariate_df.iloc[:train_size, 0]), pd.DataFrame(
+        univariate_df.iloc[:train_size, 1])
+    x_valid, y_valid = pd.DataFrame(univariate_df.iloc[train_size:, 0]), pd.DataFrame(
+        univariate_df.iloc[train_size:, 1])
+
+    data = univariate_df.filter(['y'])
+    # Convert the dataframe to a numpy array
+    dataset = data.values
+
+    scaler = MinMaxScaler(feature_range=(-1, 0))
+    scaled_data = scaler.fit_transform(dataset)
+
+    # Defines the rolling window
+    look_back = 52
+    # Split into train and test sets
+    train, test = scaled_data[:train_size - look_back, :], scaled_data[train_size - look_back:, :]
+
+    def create_dataset(dataset, look_back=1):
+        X, Y = [], []
+        for i in range(look_back, len(dataset)):
+            a = dataset[i - look_back:i, 0]
+            X.append(a)
+            Y.append(dataset[i, 0])
+        return np.array(X), np.array(Y)
+
+    x_train, y_train = create_dataset(train, look_back)
+    x_test, y_test = create_dataset(test, look_back)
+
+    # reshape input to be [samples, time steps, features]
+    x_train = np.reshape(x_train, (x_train.shape[0], 1, x_train.shape[1]))
+    x_test = np.reshape(x_test, (x_test.shape[0], 1, x_test.shape[1]))
+
+    from tensorflow.keras.models import Sequential
+    from tensorflow.keras.layers import Dense, LSTM
+
+    # Build the LSTM model
+    model = Sequential()
+    model.add(LSTM(128, return_sequences=True, input_shape=(x_train.shape[1], x_train.shape[2])))
+    model.add(LSTM(64, return_sequences=False))
+    model.add(Dense(25))
+    model.add(Dense(1))
+
+    # Compile the model
+    model.compile(optimizer='adam', loss='mean_squared_error')
+
+    # Train the model
+    model.fit(x_train, y_train, batch_size=16, epochs=10, validation_data=(x_test, y_test))
+
+    model.summary()
+
+    # Lets predict with the model
+    train_predict = model.predict(x_train)
+    test_predict = model.predict(x_test)
+
+    # invert predictions
+    train_predict = scaler.inverse_transform(train_predict)
+    y_train = scaler.inverse_transform([y_train])
+
+    test_predict = scaler.inverse_transform(test_predict)
+    y_test = scaler.inverse_transform([y_test])
+
+    y_train = univariate_df.head(train_size)['y']
+    x_test_ticks = univariate_df.tail(test_size)['ds']
+
+    y_truth = pd.DataFrame(y_test[0]).values.tolist()
+    final_y_truth = [item for sublist in y_truth for item in sublist]
+
+    y_predict = pd.DataFrame(test_predict[:,0].T).values.tolist()
+    final_y_predict = [item for sublist in y_predict for item in sublist]
+
+
+    return jsonify(x = univariate_df.tail(test_size)['ds'].dt.strftime('%Y-%m-%d %H:%M:%S').values.tolist(),
+                   truth = final_y_truth,
+                   predict = final_y_predict
+    )
 
 if __name__ == "__main__":
     db.create_all()

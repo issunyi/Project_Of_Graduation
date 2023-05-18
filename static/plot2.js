@@ -29,11 +29,11 @@ layui.use(['echarts'], function() {
             title: [
               {
                 left: 'center',
-                text: 'Gradient along the y axis'
+                text: '环境最高温度'
               }, {
                 top: '55%',
                 left: 'center',
-                  text: 'Gradient along the x axis'
+                  text: '环境最低温度'
                 }
             ],
             tooltip: {
@@ -56,6 +56,11 @@ layui.use(['echarts'], function() {
                 gridIndex: 1
             }
             ],
+            toolbox: {
+              feature: {
+                saveAsImage: {}
+              }
+            },
             grid: [
               {
                 bottom: '60%'
@@ -67,12 +72,14 @@ layui.use(['echarts'], function() {
             series: [
               {
                 type: 'line',
-                showSymbol: false,
+                showSymbol: true,
+                name: '最高温度',
                 data: data.highest_temp
               },
                     {
                 type: 'line',
-                showSymbol: false,
+                showSymbol: true,
+                name: '最低温度',
                 data: data.lowest_temp,
                 xAxisIndex: 1,
                 yAxisIndex: 1

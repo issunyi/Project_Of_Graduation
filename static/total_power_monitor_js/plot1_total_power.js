@@ -5,19 +5,18 @@ layui.use(['echarts'], function() {
          dataType: 'json',
          success: function (data) {
              let echarts = layui.echarts;
-             var plot1 = echarts.init(document.getElementById('plot1'), null, {
-                 width: 800,
+             var plot1_total_power = echarts.init(document.getElementById('plot1_total_power'), null, {
+                 width: 1000,
                  height: 400
              });
              let base = +new Date(1988, 9, 3);
              let oneDay = 24 * 3600 * 1000;
-
              option = {
                  tooltip: {trigger: 'axis', position: function (pt) {
                      return [pt[0], '10%'];
                  }
                  },
-                 title: {left: 'center', text: '系统总功率负载'
+                 title: {text: '系统负载总功率'
                  },
                  toolbox: {feature: {
                      dataZoom: {yAxisIndex: 'none'
@@ -39,7 +38,7 @@ layui.use(['echarts'], function() {
                  }
                  ],
                  series: [{
-                     name: '系统总功率负载',
+                     name: '系统负载总功率',
                      type: 'line',
                      smooth: true,
                      symbol: 'none',
@@ -48,9 +47,9 @@ layui.use(['echarts'], function() {
                  }
                  ]
              };
-             plot1.setOption(option);
+             plot1_total_power.setOption(option);
 	         window.onresize = function() {
-	    	    plot1.resize();
+	    	    plot1_total_power.resize();
 	        }
          }
      })
