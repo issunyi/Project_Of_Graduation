@@ -80,7 +80,7 @@ def total_power_monitor():
 # 功率异常点监测
 @app.route('/power_outlier_monitor')
 def power_outlier_monitor():
-    return render_template('outlier_monitor.html')
+    return render_template('power_outlier_monitor.html')
 
 @app.route('/get_environment_data')
 def get_environment_data():
@@ -139,7 +139,7 @@ def get_environment_data():
     conn.close()
 
 
-# 多元时序预测
+# fbprophet多元时序预测
 @app.route('/fbprophet')
 def fbprophet():
     conn = pymysql.Connect(
@@ -183,7 +183,7 @@ def fbprophet():
                    y_valid = y_valid_
                    )
 
-# 多元时序预测
+# lstm多元时序预测
 @app.route('/lstm')
 def lstm():
     conn = pymysql.Connect(
@@ -278,6 +278,81 @@ def lstm():
                    truth = final_y_truth,
                    predict = final_y_predict
     )
+
+# 异常值数据及阈值获取
+@app.route('/get_threshold_data')
+def get_threshold_data():
+    conn = pymysql.Connect(
+        host='localhost',
+        port=3306,
+        user='root',
+        passwd='sun010628',
+        db='test_users',
+        charset='utf8'
+    )
+
+    df = pd.read_sql_query("select * from data_process", conn)
+    raw_x = df['date']
+    raw_y = df['total_active_power']
+    df.set_index('date', inplace=True)
+
+
+    # max/min
+    threshold_min = 203505
+    threshold_max = 300392.7345
+
+    anomaly_data_max_min = []
+    normal_data_max_min = []
+    anomalies_max_min = (df['total_active_power'] < threshold_min) | (df['total_active_power'] > threshold_max)
+    for index, is_anomaly in enumerate(anomalies_max_min):
+        if is_anomaly:
+            anomaly_data_max_min.append([df.index[index].strftime('%Y-%m-%d %H:%M:%S'), df['total_active_power'].iloc[index]])
+        else:
+            normal_data_max_min.append([df.index[index].strftime('%Y-%m-%d %H:%M:%S'), df['total_active_power'].iloc[index]])
+
+
+    # 分位数
+    threshold_quantile_min = df['total_active_power'].quantile(0.03)
+    threshold_quantile_max = df['total_active_power'].quantile(0.97)
+
+    anomaly_data_quantile = []
+    normal_data_quantile = []
+    anomalies_quantile = (df['total_active_power'] < threshold_quantile_min) | (df['total_active_power'] > threshold_quantile_max)
+    for index, is_anomaly in enumerate(anomalies_quantile):
+        if is_anomaly:
+            anomaly_data_quantile.append([df.index[index].strftime('%Y-%m-%d %H:%M:%S'), df['total_active_power'].iloc[index]])
+        else:
+            normal_data_quantile.append([df.index[index].strftime('%Y-%m-%d %H:%M:%S'), df['total_active_power'].iloc[index]])
+
+
+    #3Sigama原则 IQR
+    q1 = df['total_active_power'].quantile(0.25)
+    q3 = df['total_active_power'].quantile(0.75)
+    iqr = q3 - q1
+    threshold_low = q1 - 0.5 * iqr
+    threshold_high = q3 + 0.5 * iqr
+
+    anomaly_data = []
+    normal_data = []
+
+    anomalies_ = (df['total_active_power'] < threshold_low) | (df['total_active_power'] > threshold_high)
+    for index, is_anomaly in enumerate(anomalies_):
+        if is_anomaly:
+            anomaly_data.append([df.index[index].strftime('%Y-%m-%d %H:%M:%S'), df['total_active_power'].iloc[index]])
+        else:
+            normal_data.append([df.index[index].strftime('%Y-%m-%d %H:%M:%S'), df['total_active_power'].iloc[index]])
+
+
+    return jsonify(raw_x = raw_x.dt.strftime('%Y-%m-%d %H:%M:%S').values.tolist(),
+                   raw_y = raw_y.values.tolist(),
+                   anomaly_data_max_min = anomaly_data_max_min,
+                   normal_data_max_min = normal_data_max_min,
+                   anomaly_data_quantile = anomaly_data_quantile,
+                   normal_data_quantile = normal_data_quantile,
+                   anomaly_data = anomaly_data,
+                   normal_data = normal_data)
+
+
 
 if __name__ == "__main__":
     db.create_all()
